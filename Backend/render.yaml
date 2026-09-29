@@ -1,7 +1,0 @@
-services:
-  - type: web
-    name: rhythm-backend
-    runtime: docker
-    plan: free
-    dockerfilePath: ./Backend/Dockerfile
-    healthCheckPath: /health
