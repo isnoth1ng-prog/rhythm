@@ -104,6 +104,25 @@ def search_sync(term: str, limit: int) -> list[Track]:
         ))
     return result
 
+def resolve_sync(url: str) -> str:
+    opts: dict[str, Any] = {
+        "quiet": True,
+        "skip_download": True,
+        "format": "bestaudio/best",
+        "noplaylist": True,
+    }
+    with YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+    direct = info.get("url") if info else None
+    if not direct:
+        raise ValueError("No playable stream returned")
+    return direct
+
+@app.get("/api/resolve")
+async def resolve(url: str = Query(min_length=10, max_length=2000)) -> dict[str, str]:
+    direct = await asyncio.to_thread(resolve_sync, url)
+    return {"url": direct}
+
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok", "service": "rhythm-backend"}
