@@ -1,0 +1,41 @@
+name: Build Rhythm IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Build unsigned archive
+        run: |
+          xcodebuild archive \
+            -project Rhythm.xcodeproj \
+            -scheme Rhythm \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath "$PWD/build/Rhythm.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+      - name: Package unsigned IPA
+        run: |
+          rm -rf build/Payload build/Rhythm-unsigned.ipa
+          mkdir -p build/Payload
+          cp -R build/Rhythm.xcarchive/Products/Applications/Rhythm.app build/Payload/
+          cd build
+          zip -qry Rhythm-unsigned.ipa Payload
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Rhythm-unsigned-ipa
+          path: build/Rhythm-unsigned.ipa
+          if-no-files-found: error
