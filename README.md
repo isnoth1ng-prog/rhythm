@@ -24,3 +24,6 @@ The GitHub workflow intentionally builds an unsigned IPA so Sideloadly on Window
 3. Open the IPA in Sideloadly on Windows and sign/install it to the iPhone.
 
 Apple Music playback is subject to Apple Music subscription status and MusicKit entitlement/signing requirements.
+
+## Build status
+The main branch triggers the unsigned IPA GitHub Actions workflow.
