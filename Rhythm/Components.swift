@@ -1,5 +1,4 @@
 import SwiftUI
-import MusicKit
 
 struct GlassCard<Content: View>: View {
     let content: Content
@@ -16,36 +15,38 @@ struct GlassCard<Content: View>: View {
     }
 }
 
-struct ArtworkView: View {
-    let artwork: Artwork?
+struct ArtworkURLView: View {
+    let url: URL?
     var size: CGFloat
 
     var body: some View {
-        Group {
-            if let artwork {
-                ArtworkImage(artwork, width: size, height: size)
-            } else {
+        AsyncImage(url: url) { phase in
+            switch phase {
+            case .success(let image):
+                image.resizable().scaledToFill()
+            default:
                 RoundedRectangle(cornerRadius: size * 0.12)
                     .fill(.quaternary)
                     .overlay { Image(systemName: "music.note").font(.system(size: size * 0.2)) }
             }
         }
+        .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: size * 0.12, style: .continuous))
     }
 }
 
-struct SongRow: View {
-    let song: Song
+struct BackendTrackRow: View {
+    let track: BackendTrack
     let saved: Bool
     let play: () -> Void
     let toggleSave: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
-            ArtworkView(artwork: song.artwork, size: 58)
+            ArtworkURLView(url: track.artwork, size: 58)
             VStack(alignment: .leading, spacing: 4) {
-                Text(song.title).font(.headline).lineLimit(1)
-                Text(song.artistName).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                Text(track.title).font(.headline).lineLimit(1)
+                Text(track.subtitle).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
             Button(action: toggleSave) {
