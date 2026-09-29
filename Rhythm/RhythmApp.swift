@@ -1,5 +1,4 @@
 import SwiftUI
-import MusicKit
 
 @main
 struct RhythmApp: App {
