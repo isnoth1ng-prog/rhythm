@@ -18,7 +18,7 @@ struct BackendTrack: Identifiable, Decodable, Hashable {
     }
 
     var subtitle: String {
-        if let version, !version.isEmpty { return "(artist) • (version)" }
+        if let version, !version.isEmpty { return "\(artist) • \(version)" }
         return artist
     }
 }
@@ -27,8 +27,8 @@ struct BackendTrack: Identifiable, Decodable, Hashable {
 final class RhythmBackend: ObservableObject {
     static let shared = RhythmBackend()
 
-    // Public HTTPS backend URL. The repo includes a Render deployment definition.
-    var baseURL = URL(string: "https://rhythm-backend.onrender.com")!
+    // Public HTTPS backend hosted on the user's Windows PC via Tailscale Funnel.
+    var baseURL = URL(string: "https://rhythm.tail602bdd.ts.net")!
 
     func search(_ query: String, limit: Int = 20) async throws -> [BackendTrack] {
         var components = URLComponents(url: baseURL.appendingPathComponent("api/search"), resolvingAgainstBaseURL: false)!
