@@ -1,5 +1,4 @@
 import SwiftUI
-import MusicKit
 
 struct RootView: View {
     @EnvironmentObject private var model: RhythmModel
@@ -20,9 +19,6 @@ struct RootView: View {
                 .padding(.bottom, 54)
         }
         .sheet(isPresented: $playerPresented) { PlayerView().environmentObject(model) }
-        .task {
-            if model.authorization != .authorized { await model.requestAccess() }
-        }
         .alert("Rhythm", isPresented: Binding(
             get: { model.errorMessage != nil },
             set: { if !$0 { model.errorMessage = nil } }
@@ -48,43 +44,23 @@ struct HomeView: View {
 
                     if model.isSearching { ProgressView().frame(maxWidth: .infinity) }
 
-                    if !model.artists.isEmpty {
-                        Text("Исполнители").font(.title2.bold())
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 14) {
-                                ForEach(model.artists) { artist in
-                                    NavigationLink { ArtistView(artist: artist) } label: {
-                                        GlassCard {
-                                            VStack(alignment: .leading, spacing: 8) {
-                                                Image(systemName: "person.crop.circle.fill").font(.system(size: 42))
-                                                Text(artist.name).font(.headline).lineLimit(1)
-                                            }
-                                            .frame(width: 150, alignment: .leading)
-                                        }
-                                        .foregroundStyle(.primary)
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if !model.songs.isEmpty {
+                    if !model.tracks.isEmpty {
                         Text("Песни").font(.title2.bold())
                         LazyVStack(spacing: 10) {
-                            ForEach(model.songs) { song in
-                                SongRow(
-                                    song: song,
-                                    saved: model.savedIDs.contains(song.id.rawValue),
-                                    play: { Task { await model.play(song) } },
-                                    toggleSave: { model.toggleSaved(song) }
+                            ForEach(model.tracks) { track in
+                                BackendTrackRow(
+                                    track: track,
+                                    saved: model.savedIDs.contains(track.id),
+                                    play: { Task { await model.play(track) } },
+                                    toggleSave: { model.toggleSaved(track) }
                                 )
                             }
                         }
-                    } else {
+                    } else if !model.isSearching {
                         VStack(spacing: 10) {
                             Image(systemName: "waveform").font(.system(size: 48)).foregroundStyle(.secondary)
                             Text("Найди свою музыку").font(.title3.bold())
-                            Text("Ищи песни и исполнителей в каталоге Apple Music.")
+                            Text("Поиск работает через внешний Rhythm Backend с нормализацией метаданных.")
                                 .foregroundStyle(.secondary).multilineTextAlignment(.center)
                         }
                         .frame(maxWidth: .infinity).padding(.top, 60)
@@ -105,58 +81,14 @@ struct WaveView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     Text("Моя волна").font(.system(size: 38, weight: .bold, design: .rounded))
-                    Text("Персональные рекомендации Apple Music на основе медиатеки и истории прослушивания.")
+                    Text("Персональная лента Rhythm на основе сохранённых треков и истории.")
                         .foregroundStyle(.secondary)
-
-                    if model.recommendations.isEmpty {
-                        Button("Загрузить рекомендации") { Task { await model.loadRecommendations() } }
-                            .buttonStyle(.borderedProminent)
-                    } else {
-                        ForEach(model.recommendations, id: \.id) { recommendation in
-                            RecommendationSectionView(recommendation: recommendation)
-                        }
-                    }
+                    Text("Рекомендации подключим поверх того же backend после стабилизации поиска и плеера.")
+                        .font(.footnote).foregroundStyle(.secondary)
                 }
                 .padding()
             }
             .background(Color.black.ignoresSafeArea())
-            .task {
-                if model.recommendations.isEmpty { await model.loadRecommendations() }
-            }
-        }
-    }
-}
-
-struct RecommendationSectionView: View {
-    let recommendation: MusicPersonalRecommendation
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(recommendation.title ?? "Для тебя").font(.title3.bold())
-            if let reason = recommendation.reason {
-                Text(reason).font(.subheadline).foregroundStyle(.secondary)
-            }
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 14) {
-                    ForEach(Array(recommendation.albums.prefix(10))) { album in
-                        VStack(alignment: .leading, spacing: 7) {
-                            ArtworkView(artwork: album.artwork, size: 140)
-                            Text(album.title).font(.headline).lineLimit(2)
-                            Text(album.artistName).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                        }
-                        .frame(width: 140, alignment: .leading)
-                    }
-                    ForEach(Array(recommendation.playlists.prefix(10))) { playlist in
-                        VStack(alignment: .leading, spacing: 7) {
-                            ArtworkView(artwork: playlist.artwork, size: 140)
-                            Text(playlist.name).font(.headline).lineLimit(2)
-                            Text("Плейлист").font(.caption).foregroundStyle(.secondary)
-                        }
-                        .frame(width: 140, alignment: .leading)
-                    }
-                }
-            }
         }
     }
 }
@@ -170,54 +102,12 @@ struct LibraryView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     Text("Медиатека").font(.system(size: 38, weight: .bold, design: .rounded))
                     Text("\(model.savedIDs.count) сохранённых треков").foregroundStyle(.secondary)
-                    Text("Сохранённые треки хранятся локально в Rhythm. Добавление в системную библиотеку Apple Music можно подключить отдельной кнопкой после настройки MusicKit entitlement.")
+                    Text("Избранное хранится локально в Rhythm.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading).padding()
             }
             .background(Color.black.ignoresSafeArea())
-        }
-    }
-}
-
-struct ArtistView: View {
-    let artist: Artist
-    @State private var albums: [Album] = []
-    @State private var loading = true
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                Text(artist.name).font(.system(size: 36, weight: .bold, design: .rounded))
-                Text("Дискография").font(.title2.bold())
-
-                if loading {
-                    ProgressView()
-                } else {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                        ForEach(albums) { album in
-                            GlassCard {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    ArtworkView(artwork: album.artwork, size: 150)
-                                    Text(album.title).font(.headline).lineLimit(2)
-                                    Text(album.artistName).font(.caption).foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            .padding()
-        }
-        .background(Color.black.ignoresSafeArea())
-        .task {
-            do {
-                var request = MusicCatalogSearchRequest(term: artist.name, types: [Album.self])
-                request.limit = 50
-                let response = try await request.response()
-                albums = Array(response.albums)
-            } catch { }
-            loading = false
         }
     }
 }
@@ -229,21 +119,15 @@ struct MiniPlayer: View {
     var body: some View {
         Button(action: open) {
             HStack(spacing: 10) {
-                if let current = model.player.queue.currentEntry {
-                    ArtworkView(artwork: current.artwork, size: 44)
+                if let current = model.currentTrack {
+                    ArtworkURLView(url: current.artwork, size: 44)
                     VStack(alignment: .leading) {
                         Text(current.title).font(.subheadline.bold()).lineLimit(1)
-                        Text(current.subtitle ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        Text(current.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                     Spacer()
-                    Button {
-                        Task {
-                            if model.player.state.playbackStatus == .playing { model.player.pause() }
-                            else { try? await model.player.play() }
-                        }
-                    } label: {
-                        Image(systemName: model.player.state.playbackStatus == .playing ? "pause.fill" : "play.fill")
-                            .font(.title3)
+                    Button(action: model.togglePlayPause) {
+                        Image(systemName: model.isPlaying ? "pause.fill" : "play.fill").font(.title3)
                     }
                     .buttonStyle(.plain)
                 } else {
