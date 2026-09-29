@@ -104,6 +104,7 @@ struct ProgressSlider: View {
         switch item {
         case .song(let song): return song.duration ?? 0
         case .musicVideo: return 0
+        @unknown default: return 0
         }
     }
 
